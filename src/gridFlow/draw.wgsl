@@ -47,8 +47,6 @@ fn fragment_main(
     var xBpos: u32 = u32(floor(xPos * uniforms.bufferx));
     var yBpos: u32 = u32(floor(yPos * uniforms.buffery));
 
-    // xBpos = min(xBpos, u32(floor(uniforms.bufferx)));
-    // yBpos = min(yBpos, u32(floor(uniforms.buffery)));
 
     var indexParticle: u32 = yBpos + xBpos * u32(floor(uniforms.buffery));
 
@@ -56,16 +54,14 @@ fn fragment_main(
 
     var avg: f32 = 0.;
     avg += particlesA.particles[indexParticle].density;
-    // avg += particlesA.particles[indexParticle].color;
-    // avg += particlesA.particles[indexParticle].vel.x;
-    // avg += particlesA.particles[indexParticle].vel.y;
     avg = avg / 1.;
     var col = vec3(0.9, 0.3, 0.6);
-    var retCol = vec4(avg * col, 1.0);
-    // retCol.x = fract(f32(xBpos) / uniforms.bufferx * 1.);
-    // retCol.y = 0.;
-    // retCol.z = 0.;
-    // retCol = vec4(col, 1.0);
-    // retCol.x = abs(mouseX - xPos) * 5.;
-    return retCol;
+    var col_density = vec3(1., 0., 0.);
+
+    var col_velocity_x = vec3(0., 1., 0.);
+    var col_velocity_y = vec3(0., 0., 1.);
+
+    var retCol = avg * col_density ;
+    retCol += col_velocity_y * particlesA.particles[indexParticle].color;
+    return vec4(retCol, 1.);
 }

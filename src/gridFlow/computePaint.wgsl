@@ -44,10 +44,10 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID: vec3<u32>) {
     var dist = 0.;
     dist += ((xPos - mouseX) * (xPos - mouseX));
     dist += ((yPos - mouseY) * (yPos - mouseY));
-    dist = clamp(dist, 0., 2.);
-    var randomSize = abs(fract(uniforms.frame * 0.005)) * 0.0006;
-    vDensity += min(1., 0.0001 / dist);
+    // dist = clamp(dist, 0., 10.);
+    // vDensity += min(1., 0.001 / dist) / 5.;
 
+    vDensity += 0.0001 / dist;
     particlesB.particles[index].density = vDensity ;
     particlesB.particles[index].color = vcolor;
     particlesB.particles[index].vel = vVel;

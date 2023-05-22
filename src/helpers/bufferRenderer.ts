@@ -1,5 +1,4 @@
 import { Dimensions } from "../core/framework";
-import drawWGSL from './shaders/draw.wgsl';
 
 export class BufferRenderer {
     device: GPUDevice;
@@ -19,6 +18,7 @@ export class BufferRenderer {
     constructor(
         device: GPUDevice,
         context: GPUCanvasContext, 
+        shader: string,
         screenDimension: Dimensions, 
         bufferDimension: Dimensions,
         bufferArray: GPUBuffer[],
@@ -65,13 +65,13 @@ export class BufferRenderer {
             }),
             vertex: {
                 module: this.device.createShaderModule({
-                    code: drawWGSL,
+                    code: shader,
                 }),
                 entryPoint: 'vertex_main',
             },
             fragment: {
                 module: this.device.createShaderModule({
-                    code: drawWGSL,
+                    code: shader,
                 }),
                 entryPoint: 'fragment_main',
                 targets: [
