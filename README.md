@@ -3,6 +3,9 @@
 - On linux chrome 113 doesn't work - use chrome dev with `#enable-vulkan` and `#enable-unsafe-webgpu`.
 - All experiments are based on new compute shaders written in WGSL which was not possible in any web browsers before.
 
+## Demo
+- Unstable grid diffuse shader [Link](https://sudhirattri.com/diffusion/)- primitive fluid simulation diffusion step using averages of surrounding which is a numerically unstable method; The decay of local densities is faster to hide this fact. 
+
 ## Configure
 
 - Uncomment any of these lines to run a specific experiment
