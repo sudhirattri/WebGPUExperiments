@@ -15,13 +15,6 @@ struct Uniforms {
 struct Particles {
   particles: array<Particle>,
 }
-
-fn rand(co: vec2<f32>) -> f32 {
-    var randomVec2 = vec2(12.9898, 78.233);
-    var rand1: f32 = sin(dot(randomVec2, co)) * 43758.5453;
-    return fract(rand1);
-}
-
 @binding(0) @group(0) var<uniform> uniforms : Uniforms;
 @binding(1) @group(0) var<storage, read> particlesA : Particles;
 @binding(2) @group(0) var<storage, read_write> particlesB : Particles;
@@ -31,26 +24,35 @@ fn rand(co: vec2<f32>) -> f32 {
 fn main(@builtin(global_invocation_id) GlobalInvocationID: vec3<u32>) {
     var index = GlobalInvocationID.y + GlobalInvocationID.x * u32(uniforms.buffery);
 
-    var mouseX: f32 = uniforms.mouseX / uniforms.width;
-    var mouseY: f32 = uniforms.mouseY / uniforms.height;
-
-    var xPos: f32 = f32(GlobalInvocationID.x) / uniforms.bufferx;
-    var yPos: f32 = f32(GlobalInvocationID.y) / uniforms.buffery;
-
     var vDensity = particlesA.particles[index].density;
     var vcolor = particlesA.particles[index].color;
     var vVel = particlesA.particles[index].vel;
 
-    var dist = 0.;
-    dist += ((xPos - mouseX) * (xPos - mouseX));
-    dist += ((yPos - mouseY) * (yPos - mouseY));
-    dist = clamp(dist, 0., 2.);
-    var randomSize = abs(fract(uniforms.frame * 0.005)) * 0.0006;
-    vDensity += min(1., 0.0001 / dist);
 
-    particlesB.particles[index].density = vDensity ;
+    var kernelSize: i32 = 1;
+    var avgDensity: f32 = 0.0;
+
+    var diffuse: f32 = 0.0;
+    var t: f32 = 1. / 9.;
+    var kernel = mat3x3<f32>(
+        vec3<f32>(1., 1., 1.),
+        vec3<f32>(1., 1., 1.),
+        vec3<f32>(1., 1., 1.)
+    );
+
+    for (var i = -kernelSize; i <= kernelSize; i++) {
+        for (var j = -kernelSize; j <= kernelSize; j++) {
+            var limitx = i32(uniforms.bufferx)-1;
+            var limity = i32(uniforms.buffery)-1;
+            var newX = clamp(i32(GlobalInvocationID.x) + i, 0, limitx);
+            var newY = clamp(i32(GlobalInvocationID.y) + j, 0, limity);
+            var indexParticle: i32 = newY + newX * i32(uniforms.buffery);
+            avgDensity += particlesA.particles[indexParticle].density * kernel[j][i];
+        }
+    }
+    avgDensity = avgDensity / 9.;
+    particlesB.particles[index].density = avgDensity * 0.99;
+
     particlesB.particles[index].color = vcolor;
     particlesB.particles[index].vel = vVel;
 }
-
-

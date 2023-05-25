@@ -57,8 +57,8 @@ export class GridBuffer {
 
             initialParticleData[4 * i + 0] = 0.5;
             initialParticleData[4 * i + 1] = yCoord;
-            initialParticleData[4 * i + 2] = 0.;
-            initialParticleData[4 * i + 3] = 0.;
+            initialParticleData[4 * i + 2] = Math.random();
+            initialParticleData[4 * i + 3] = Math.random();
         }
         this.bufferSize = initialParticleData.byteLength;
 

@@ -44,10 +44,9 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID: vec3<u32>) {
     var dist = 0.;
     dist += ((xPos - mouseX) * (xPos - mouseX));
     dist += ((yPos - mouseY) * (yPos - mouseY));
-    // dist = clamp(dist, 0., 10.);
-    // vDensity += min(1., 0.001 / dist) / 5.;
+    dist = sqrt(dist) * uniforms.width;
+    vDensity += 2. / (2.0 + dist);
 
-    vDensity += 0.0001 / dist;
     particlesB.particles[index].density = vDensity ;
     particlesB.particles[index].color = vcolor;
     particlesB.particles[index].vel = vVel;

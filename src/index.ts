@@ -1,9 +1,8 @@
 import './style.css';
 import { Boids } from './boids/boids'
 import { ToyShader } from './ToyShader/ToyShader'
-import { BufferRW } from './BufferRW/bufferRW'
 import { Dimensions, WebGPUProject, createWebGPUProject } from './core/framework';
-import { GridFlow } from './gridFlow/gridFlow';
+import { GridDiffusionUnstable } from './gridDiffusionUnstable/gridDiffusion';
 
 async function init(): Promise<void> {
     let canvas: HTMLCanvasElement = <HTMLCanvasElement>document.getElementById("webgpu-canvas");
@@ -20,7 +19,9 @@ async function init(): Promise<void> {
 
     
     let currentProject: WebGPUProject;
-    currentProject = new GridFlow(device, context, dimension);
+    // currentProject = new Boids(device, context);
+    currentProject = new ToyShader(device, context, dimension);
+    // currentProject = new GridDiffusionUnstable(device, context, dimension);
 
     createWebGPUProject(currentProject, canvas);
 }

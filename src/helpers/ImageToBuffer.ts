@@ -2,47 +2,7 @@ import { Dimensions } from '../core/framework';
 import imageToBufferWGSL from './shaders/ImageToBuffer.wgsl';
 const WORKGROUP_SIZE = 8
 
-export async function copyImageToBuffer(device: GPUDevice,buffer: GPUBuffer,bufferSize: number, bufferDimensions: Dimensions){
-    const img = document.createElement('img');
-    img.src = new URL(
-      './../gridFlow/paint.png',
-      import.meta.url
-    ).toString();
-    await img.decode();
-    const imageBitmap : ImageBitmap= await createImageBitmap(img);
-    const commandEncoder: GPUCommandEncoder = device.createCommandEncoder();
-    let imageTexture: GPUTexture;
-        {
-            imageTexture = device.createTexture({
-            size: [imageBitmap.width, imageBitmap.height, 1],
-            format: 'rgba8unorm' as GPUTextureFormat,
-            usage:
-              GPUTextureUsage.COPY_SRC |
-              GPUTextureUsage.COPY_DST |
-              GPUTextureUsage.RENDER_ATTACHMENT
-          });
-          device.queue.copyExternalImageToTexture(
-            { source: imageBitmap },
-            { texture: imageTexture },
-            [imageBitmap.width, imageBitmap.height]
-          );
-        }
-    console.log(imageBitmap)
-    commandEncoder.copyTextureToBuffer(
-        {
-            texture: imageTexture,
-            mipLevel: 0,
-            origin: { x: 0, y: 0, z: 0 },
-        },
-        {
-            buffer:buffer,
-            offset: 0,
-            bytesPerRow: imageBitmap.width*4
-        },
-        [imageBitmap.width, imageBitmap.height]
-    )
-    device.queue.submit([commandEncoder.finish()]);
-}
+
 
 export class ImageToBuffer {
     imageToBufferBindGroupLayout: GPUBindGroupLayout
@@ -81,7 +41,6 @@ export class ImageToBuffer {
             imageDataF32[4 * i + 3] = imageDataTemp[4 * i + 3]/256.0;
         }
 
-        console.log("image",imageDataF32.length,imageDataTemp.length,img.width* img.height*4)
         
         const imageBuffer:GPUBuffer = this.device.createBuffer({
             size: imageDataF32.byteLength,
@@ -194,5 +153,6 @@ export class ImageToBuffer {
         passEncoder.dispatchWorkgroups(this.bufferDimensions.width / WORKGROUP_SIZE, this.bufferDimensions.height / WORKGROUP_SIZE);
         passEncoder.end();
         this.device.queue.submit([commandEncoder.finish()]);
+        console.log("Copied Image to buffer")
     }
 }

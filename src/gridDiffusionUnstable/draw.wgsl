@@ -62,6 +62,9 @@ fn fragment_main(
     var col_velocity_y = vec3(0., 0., 1.);
 
     var retCol = avg * col_density ;
-    retCol += col_velocity_y * particlesA.particles[indexParticle].color;
+    retCol += col_velocity_y * 0.4;
+    // retCol += col_velocity_y * particlesA.particles[indexParticle].vel.y;
+    // retCol += col_velocity_x * particlesA.particles[indexParticle].vel.x;
+
     return vec4(retCol, 1.);
 }
