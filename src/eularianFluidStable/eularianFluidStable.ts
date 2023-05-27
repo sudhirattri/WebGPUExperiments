@@ -3,13 +3,17 @@ import * as dat from 'dat.gui';
 
 import { ImageToBuffer } from '../helpers/ImageToBuffer';
 
-import { BufferRenderer } from '../helpers/bufferRenderer';
-import { GridBuffer } from '../helpers/gridBuffer';
 import { GridShader } from '../helpers/gridShader';
 
-import diffuseWGSL from './computeDiffuse.wgsl';
+import gravityStepWGSL from './gravityStep.wgsl';
+import divergenceSolveStep from './divergenceSolveStep.wgsl';
+import advectionSolverStep from './advectionSolverStep.wgsl';
 import paintWGSL from './computePaint.wgsl';
-import drawWGSL from './draw.wgsl';
+import drawFluid from './drawFluid.wgsl';
+
+import { FluidBuffer } from './fluidBuffer';
+import { FluidRenderer } from './FluidRenderer';
+import { FluidBufferShader } from './fluidBufferShader';
 
 function readFile(file:File){
     return new Promise((resolve, reject) => {
@@ -22,7 +26,7 @@ function readFile(file:File){
     });
   }
   
-export class GridDiffusionUnstable implements WebGPUProject {
+export class EulerianFluidStable implements WebGPUProject {
     device: GPUDevice;
     context: GPUCanvasContext;
     screenDimension: Dimensions
@@ -37,15 +41,20 @@ export class GridDiffusionUnstable implements WebGPUProject {
     lastMouseY: number = 0;
     simParams: Record<string, any>;
 
-    gridBuffer: GridBuffer;
+    fluidBuffer: FluidBuffer;
     imageToBufferHelper: ImageToBuffer;
-    bufferRenderer: BufferRenderer;
-    gridDiffuseShader : GridShader;
-    paintShader : GridShader;
+    fluidRenderer: FluidRenderer;
+
+    gravityStep : FluidBufferShader;
+    divergenceSolverStep : FluidBufferShader;
+    advectionSolverStep : FluidBufferShader;
+    paintShader : FluidBufferShader;
 
     BUFFER_SIZE_X : number = 256
     BUFFER_SIZE_Y : number = 144
-    
+
+    GAUSS_SEIDEL_ITERS: number = 1;
+
     constructor(device: GPUDevice, context: GPUCanvasContext, screenDimension: Dimensions) {
         this.device = device;
         this.context = context;
@@ -59,7 +68,7 @@ export class GridDiffusionUnstable implements WebGPUProject {
         const gui: dat.GUI = new dat.GUI({ name: 'My GUI' });
         var gridSettings = gui.addFolder('Grid Settings');
         var  ImageInputController : any;
-        var thisObj : GridDiffusionUnstable = this;
+        var thisObj : EulerianFluidStable = this;
         this.simParams = {
             resolutionScaling:'256x144',
             speed: 1.0,
@@ -72,8 +81,8 @@ export class GridDiffusionUnstable implements WebGPUProject {
                     await thisObj.imageToBufferHelper.initialize(
                         thisObj.device, 
                         fileURL,
-                        thisObj.gridBuffer.buffersArray, 
-                        thisObj.gridBuffer.bufferSize,
+                        thisObj.fluidBuffer.buffersArray, 
+                        thisObj.fluidBuffer.bufferSize,
                         {
                             height:thisObj.BUFFER_SIZE_Y,
                             width:thisObj.BUFFER_SIZE_X
@@ -85,8 +94,8 @@ export class GridDiffusionUnstable implements WebGPUProject {
                     await thisObj.imageToBufferHelper.initialize(
                         thisObj.device, 
                         new URL('./monke.jpg',import.meta.url).toString(),
-                        thisObj.gridBuffer.buffersArray, 
-                        thisObj.gridBuffer.bufferSize,
+                        thisObj.fluidBuffer.buffersArray, 
+                        thisObj.fluidBuffer.bufferSize,
                         {
                             height:thisObj.BUFFER_SIZE_Y,
                             width:thisObj.BUFFER_SIZE_X
@@ -94,7 +103,7 @@ export class GridDiffusionUnstable implements WebGPUProject {
                     thisObj.imageToBufferHelper.performCopy(thisObj.frameCount%2);
                 }
             },
-            about: "Unstable grid diffusion based on averaging neighbor cells - results unstable numerical value prone to explosion of densities"
+            about: "Stable fluid simulation on grid"
         };
         const resMapping :Record<string, Array<number>> = {
             '32x24':[32, 24],
@@ -125,12 +134,17 @@ export class GridDiffusionUnstable implements WebGPUProject {
             '1024x576':'1024x576',
         }).onFinishChange(updateSimResolution);
         gridSettings.add(this.simParams, "speed", 0, 5, 0.1).onFinishChange(updateSimSpeed);
-        // gridSettings.add(this.simParams, 'loadImage').name('Loaded Image');
         ImageInputController = gridSettings.add(this.simParams, 'loadImageInput').name(`Texture Upload : ${"monke.png"}`);
         gridSettings.add(this.simParams, 'copyImageToBuffer').name(`Copy Texture to Buffer`);
         gridSettings.add(this.simParams, 'about')
+
+        let aboutElement : HTMLElement = gridSettings.__controllers[4].domElement;
+        let aboutInput : HTMLElement = aboutElement.children[0] as HTMLElement;
+        aboutInput.setAttribute("disabled", "true");
+
+        // aboutInput["style"].height = "200px";
+
         console.log(gridSettings.__controllers[4].domElement)
-        // aboutSettings.__controllers[0].domElement;
         gridSettings.open()
 
         hiddenFileInput.onchange = function(event:any) {
@@ -143,60 +157,72 @@ export class GridDiffusionUnstable implements WebGPUProject {
     }
     async reRender() {
 
-        this.gridBuffer = new GridBuffer(this.device, {
+        this.fluidBuffer = new FluidBuffer(this.device, {
             height: this.BUFFER_SIZE_Y,
             width: this.BUFFER_SIZE_X
         })
 
-        this.gridDiffuseShader = new GridShader(
+        this.gravityStep = new FluidBufferShader(
             this.device,
-            this.gridBuffer,
-            diffuseWGSL,
+            this.fluidBuffer,
+            gravityStepWGSL,
+            this.screenDimension,
+            {
+                width:this.BUFFER_SIZE_X,
+                height:this.BUFFER_SIZE_Y
+            });
+        
+        this.divergenceSolverStep = new FluidBufferShader(
+            this.device,
+            this.fluidBuffer,
+            divergenceSolveStep,
+            this.screenDimension,
+            {
+                width:this.BUFFER_SIZE_X,
+                height:this.BUFFER_SIZE_Y
+            });
+        
+        this.advectionSolverStep = new FluidBufferShader(
+            this.device,
+            this.fluidBuffer,
+            advectionSolverStep,
             this.screenDimension,
             {
                 width:this.BUFFER_SIZE_X,
                 height:this.BUFFER_SIZE_Y
             });
 
-        this.paintShader = new GridShader(
-            this.device,
-            this.gridBuffer,
-            paintWGSL,
-            this.screenDimension,
-            {
-                width:this.BUFFER_SIZE_X,
-                height:this.BUFFER_SIZE_Y
-            });
+        // this.paintShader = new GridShader(
+        //     this.device,
+        //     this.gridBuffer,
+        //     paintWGSL,
+        //     this.screenDimension,
+        //     {
+        //         width:this.BUFFER_SIZE_X,
+        //         height:this.BUFFER_SIZE_Y
+        //     });
 
-        this.bufferRenderer = new BufferRenderer(
+        this.fluidRenderer = new FluidRenderer(
             this.device,
             this.context,
-            drawWGSL,
+            drawFluid,
             this.screenDimension,
             {
                 width:this.BUFFER_SIZE_X,
                 height:this.BUFFER_SIZE_Y
             },
-            this.gridBuffer.buffersArray,
-            this.gridBuffer.bufferSize)
+            this.fluidBuffer.buffersArray,
+            this.fluidBuffer.bufferSize,
+            this.fluidBuffer.auxiliaryBuffer,
+            this.fluidBuffer.auxiliaryBufferSize
+            )
 
         this.imageToBufferHelper = new ImageToBuffer();
-
-        // await this.imageToBufferHelper.initialize(
-        //     this.device, 
-        //     new URL('./monke.jpg',import.meta.url).toString(),
-        //     this.gridBuffer.buffersArray, 
-        //     this.gridBuffer.bufferSize,
-        //     {
-        //         height:this.BUFFER_SIZE_Y,
-        //         width:this.BUFFER_SIZE_X
-        //     });
-        // this.imageToBufferHelper.performCopy(this.frameCount%2);
         
         this.frameCount = 0;
     }
 
-    render(frameRate: number) {
+    render(deltaTime: number) {
         if (this.paused)
             return;
         let computeTimes = 0;
@@ -211,8 +237,22 @@ export class GridDiffusionUnstable implements WebGPUProject {
 
         const commandEncoder = this.device.createCommandEncoder();
 
+        // this.device.queue.writeBuffer(
+        //     this.paintShader.uniformBuffer,
+        //     0,
+        //     new Float32Array([
+        //         this.screenDimension.width,
+        //         this.screenDimension.height,
+        //         this.BUFFER_SIZE_X,
+        //         this.BUFFER_SIZE_Y,
+        //         this.lastMouseX,
+        //         this.lastMouseY,
+        //         this.frameCount
+        //     ])
+        // );
+
         this.device.queue.writeBuffer(
-            this.paintShader.uniformBuffer,
+            this.fluidRenderer.uniformBuffer,
             0,
             new Float32Array([
                 this.screenDimension.width,
@@ -221,24 +261,78 @@ export class GridDiffusionUnstable implements WebGPUProject {
                 this.BUFFER_SIZE_Y,
                 this.lastMouseX,
                 this.lastMouseY,
-                this.frameCount
+                deltaTime
             ])
         );
+
+        this.device.queue.writeBuffer(
+            this.gravityStep.uniformBuffer,
+            0,
+            new Float32Array([
+                this.screenDimension.width,
+                this.screenDimension.height,
+                this.BUFFER_SIZE_X,
+                this.BUFFER_SIZE_Y,
+                this.lastMouseX,
+                this.lastMouseY,
+                deltaTime
+            ])
+        );
+
+        this.device.queue.writeBuffer(
+            this.divergenceSolverStep.uniformBuffer,
+            0,
+            new Float32Array([
+                this.screenDimension.width,
+                this.screenDimension.height,
+                this.BUFFER_SIZE_X,
+                this.BUFFER_SIZE_Y,
+                this.lastMouseX,
+                this.lastMouseY,
+                1.9
+            ])
+        );
+
+        this.device.queue.writeBuffer(
+            this.advectionSolverStep.uniformBuffer,
+            0,
+            new Float32Array([
+                this.screenDimension.width,
+                this.screenDimension.height,
+                this.BUFFER_SIZE_X,
+                this.BUFFER_SIZE_Y,
+                this.lastMouseX,
+                this.lastMouseY,
+                deltaTime
+            ])
+        );
+
+        // console.log("Delat",deltaTime)
         {
-            if (this.lastPressed) {
-                this.paintShader.render(commandEncoder,this.frameCount % 2);
-                ++this.frameCount;
-                this.lastPressed = false;
-            }
+            // if (this.lastPressed) {
+            //     this.paintShader.render(commandEncoder,this.frameCount % 2);
+            //     ++this.frameCount;
+            //     this.lastPressed = false;
+            // }
         }
         {
             while (computeTimes--) {
-                this.gridDiffuseShader.render(commandEncoder,this.frameCount % 2)
+                
+                // Add Gravity
+                this.gravityStep.render(commandEncoder,this.frameCount % 2)
                 ++this.frameCount;
+
+                // Forcing Incompressibility
+                let iter = this.GAUSS_SEIDEL_ITERS;
+                while(iter--){
+                    // console.log("Doing")
+                    this.divergenceSolverStep.render(commandEncoder,this.frameCount % 2);
+                    ++this.frameCount;
+                }
             }
         }
         {
-            this.bufferRenderer.render(commandEncoder,this.frameCount % 2)
+            this.fluidRenderer.render(commandEncoder,this.frameCount % 2)
         }
         this.device.queue.submit([commandEncoder.finish()]);
         ++this.renderFrameCount;

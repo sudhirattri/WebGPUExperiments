@@ -9,7 +9,7 @@ export interface WebGPUProject {
     device: GPUDevice
     context: GPUCanvasContext
     initialize: () => void
-    render: (frameRate: number) => void
+    render: (deltaTime: number) => void
     onClick: (mouseX: number, mouseY: number) => void
     onDragFinished: (dx: number, dy: number, mouseX: number, mouseY: number) => void
     onDrag: (mouseX: number, mouseY: number) => void
@@ -31,12 +31,17 @@ export async function createWebGPUProject(currentProject: WebGPUProject, canvas:
     let updateFrame = () => {
         stats.begin();
         let currentFrame = performance.now();
-        if (typeof lastFrame !== "undefined")
+        let deltaTime = 0;
+        if (typeof lastFrame !== "undefined"){
             sumDelta += 1000.0 / (currentFrame - lastFrame);
+            deltaTime = (currentFrame - lastFrame)/1000;
+        }
+
         numFrames += 1;
         lastFrame = currentFrame;
-        currentProject.render(sumDelta / numFrames)
-
+        // currentProject.render(sumDelta / numFrames)
+        currentProject.render(deltaTime)
+        
         stats.end();
         requestAnimationFrame(updateFrame);
     }

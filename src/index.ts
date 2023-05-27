@@ -3,6 +3,7 @@ import { Boids } from './boids/boids'
 import { ToyShader } from './ToyShader/ToyShader'
 import { Dimensions, WebGPUProject, createWebGPUProject } from './core/framework';
 import { GridDiffusionUnstable } from './gridDiffusionUnstable/gridDiffusion';
+import { EulerianFluidStable } from './eularianFluidStable/eularianFluidStable';
 
 async function init(): Promise<void> {
     let canvas: HTMLCanvasElement = <HTMLCanvasElement>document.getElementById("webgpu-canvas");
@@ -21,7 +22,8 @@ async function init(): Promise<void> {
     let currentProject: WebGPUProject;
     // currentProject = new Boids(device, context);
     // currentProject = new ToyShader(device, context, dimension);
-    currentProject = new GridDiffusionUnstable(device, context, dimension);
+    // currentProject = new GridDiffusionUnstable(device, context, dimension);
+    currentProject = new EulerianFluidStable(device, context, dimension);
 
     createWebGPUProject(currentProject, canvas);
 }
