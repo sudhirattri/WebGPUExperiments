@@ -20,10 +20,10 @@ async function init(): Promise<void> {
 
     
     let currentProject: WebGPUProject;
-    // currentProject = new Boids(device, context);
+    currentProject = new Boids(device, context);
     // currentProject = new ToyShader(device, context, dimension);
     // currentProject = new GridDiffusionUnstable(device, context, dimension);
-    currentProject = new EulerianFluidStable(device, context, dimension);
+    // currentProject = new EulerianFluidStable(device, context, dimension);
 
     createWebGPUProject(currentProject, canvas);
 }

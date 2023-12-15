@@ -28,6 +28,7 @@
   "scripts": {
     "watch": "webpack --watch",
     "build": "webpack",
-    "start": "webpack serve"
+    "start": "webpack serve",
+    "sketch": "http-server -o /sketches"
   }
 }
